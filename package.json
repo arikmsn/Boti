@@ -2,11 +2,11 @@
   "name": "boti",
   "version": "1.0.0",
   "main": "index.js",
- "dependencies": {
-  "express": "^4.18.2",
-  "axios": "^1.6.0",
-  "@google/generative-ai": "^0.1.0"
-}
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "@google/generative-ai": "^0.1.0"
+  },
   "scripts": {
     "start": "node index.js"
   }
