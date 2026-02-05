@@ -10,10 +10,10 @@ const GEMINI_API_KEY = "AIzaSyB_zaUu7dK-ugcCXRMIdM18HRWsu5FdZhM";
 const WHATSAPP_TOKEN = "EAAZBE0LZA46GwBQiKr5gacQ5rgBypSN4AylRuJLvbZCo9IsO5tKjFM05PDg3fZAxp9Nr97JJpYoy4YF7py3lUXXJ6ZAV51eZBSMYBkh0qP58s3GM1ZA3QWZBCo1SnDMoZA2NEmFrWuYet5cBbkEVIIjz0NthLU5cfkk89o4mVgCBNJblGxsIOJRGMq6HsfG2VolZBiAgpTjeQy8JglfhAg13SiujAF2KY9KJIr1tFQQHd1NUAQexYQzZBDOPahmWLUvT53zLrNwt87XwIY7kvzzkgZDZD";
 const VERIFY_TOKEN = "Boti123"; // הטוקן שהגדרת ב-Webhook של מטא
 
-// --- הגדרת בינה מלאכותית (Gemini) ---
+// שינינו את השם ל-gemini-1.5-flash-8b (גרסה קלה ומהירה יותר שתמיד זמינה)
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel(
-  { model: "gemini-1.5-flash" },
+  { model: "gemini-1.5-flash-8b" }, 
   { apiVersion: "v1beta" }
 );
 
