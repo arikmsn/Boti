@@ -5,57 +5,76 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const app = express();
 app.use(express.json());
 
-// מפתחות - כאן מדביקים את מה שהעתקנו
+// --- הגדרות מפתחות ---
 const GEMINI_API_KEY = "AIzaSyB_zaUu7dK-ugcCXRMIdM18HRWsu5FdZhM";
 const WHATSAPP_TOKEN = "EAAZBE0LZA46GwBQiKr5gacQ5rgBypSN4AylRuJLvbZCo9IsO5tKjFM05PDg3fZAxp9Nr97JJpYoy4YF7py3lUXXJ6ZAV51eZBSMYBkh0qP58s3GM1ZA3QWZBCo1SnDMoZA2NEmFrWuYet5cBbkEVIIjz0NthLU5cfkk89o4mVgCBNJblGxsIOJRGMq6HsfG2VolZBiAgpTjeQy8JglfhAg13SiujAF2KY9KJIr1tFQQHd1NUAQexYQzZBDOPahmWLUvT53zLrNwt87XwIY7kvzzkgZDZD";
+const VERIFY_TOKEN = "Boti123"; // הטוקן שהגדרת ב-Webhook של מטא
+
+// --- הגדרת בינה מלאכותית (Gemini) ---
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: "v1beta" });
-
-
-// שים לב למבנה: שם המודל בסוגריים הראשונים, והגרסה בשניים
 const model = genAI.getGenerativeModel(
   { model: "gemini-1.5-flash" },
   { apiVersion: "v1beta" }
 );
 
+// --- אימות ה-Webhook מול מטא ---
 app.get('/webhook', (req, res) => {
-  if (req.query['hub.verify_token'] === 'Boti123') {
-    res.send(req.query['hub.challenge']);
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token === VERIFY_TOKEN) {
+    res.status(200).send(challenge);
   } else {
     res.sendStatus(403);
   }
 });
 
+// --- קבלת הודעות ושליחת תשובות ---
 app.post('/webhook', async (req, res) => {
   const body = req.body;
-  if (body.object === 'whatsapp_business_account' && body.entry[0].changes[0].value.messages) {
-    const message = body.entry[0].changes[0].value.messages[0];
-    const from = message.from;
-    const msgText = message.text.body;
 
-    console.log("הודעה ממשתמש: " + msgText);
+  // בדיקה אם זו הודעת וואטסאפ נכנסת
+  if (body.object === 'whatsapp_business_account') {
+    if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
+      const message = body.entry[0].changes[0].value.messages[0];
+      const from = message.from; // המספר של המשתמש
+      const msgText = message.text ? message.text.body : ""; // הטקסט שהמשתמש שלח
 
-    try {
-      // 1. שואלים את ג'מיני
-      const result = await model.generateContent(msgText);
-      const botResponse = result.response.text();
+      if (msgText) {
+        console.log(`קיבלתי הודעה מ-${from}: ${msgText}`);
 
-      // 2. שולחים את התשובה של ג'מיני לוואטסאפ
-      await axios({
-        method: "POST",
-        url: `https://graph.facebook.com/v18.0/${body.entry[0].changes[0].value.metadata.phone_number_id}/messages`,
-        data: {
-          messaging_product: "whatsapp",
-          to: from,
-          text: { body: botResponse },
-        },
-        headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` },
-      });
-    } catch (err) {
-      console.log("שגיאה: " + err.message);
+        try {
+          // 1. שואלים את ג'מיני ומקבלים תשובה
+          const result = await model.generateContent(msgText);
+          const response = await result.response;
+          const botResponse = response.text();
+
+          // 2. שולחים את התשובה חזרה לוואטסאפ
+          await axios({
+            method: "POST",
+            url: `https://graph.facebook.com/v18.0/${body.entry[0].changes[0].value.metadata.phone_number_id}/messages`,
+            data: {
+              messaging_product: "whatsapp",
+              to: from,
+              text: { body: botResponse },
+            },
+            headers: { 
+              "Authorization": `Bearer ${WHATSAPP_TOKEN}`,
+              "Content-Type": "application/json"
+            },
+          });
+          console.log("התשובה נשלחה בהצלחה!");
+        } catch (err) {
+          console.error("שגיאה בתהליך:", err.response ? err.response.data : err.message);
+        }
+      }
     }
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
   }
-  res.sendStatus(200);
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Boti is now SMART!'));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Boti is online on port ${PORT}`));
