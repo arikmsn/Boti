@@ -5,7 +5,7 @@ app.use(express.json());
 
 const VERIFY_TOKEN = 'Boti123';
 // כאן תצטרך להדביק את הטוקן שתקבל מ-Meta (נסביר לך איך עוד רגע)
-const ACCESS_TOKEN = 'YOUR_ACCESS_TOKEN_HERE'; 
+const ACCESS_TOKEN = 'EAAZBE0LZA46GwBQiKr5gacQ5rgBypSN4AylRuJLvbZCo9IsO5tKjFM05PDg3fZAxp9Nr97JJpYoy4YF7py3lUXXJ6ZAV51eZBSMYBkh0qP58s3GM1ZA3QWZBCo1SnDMoZA2NEmFrWuYet5cBbkEVIIjz0NthLU5cfkk89o4mVgCBNJblGxsIOJRGMq6HsfG2VolZBiAgpTjeQy8JglfhAg13SiujAF2KY9KJIr1tFQQHd1NUAQexYQzZBDOPahmWLUvT53zLrNwt87XwIY7kvzzkgZDZD'; 
 
 // אימות ה-Webhook (מה שכבר עשית)
 app.get('/webhook', (req, res) => {
