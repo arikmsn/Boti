@@ -1,20 +1,53 @@
 const express = require('express');
+const axios = require('axios'); // ספריה שעוזרת לשלוח הודעות
 const app = express();
 app.use(express.json());
 
-// זה החלק שמאשר לפייסבוק שהשרת שלך תקין
-app.get('/webhook', (req, res) => {
-  const myToken = "Boti123"; // זה הקוד הסודי שאתה ממציא
-  
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+const VERIFY_TOKEN = 'Boti123';
+// כאן תצטרך להדביק את הטוקן שתקבל מ-Meta (נסביר לך איך עוד רגע)
+const ACCESS_TOKEN = 'YOUR_ACCESS_TOKEN_HERE'; 
 
-  if (mode === 'subscribe' && token === myToken) {
-    res.status(200).send(challenge);
+// אימות ה-Webhook (מה שכבר עשית)
+app.get('/webhook', (req, res) => {
+  if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
+    res.send(req.query['hub.challenge']);
   } else {
     res.sendStatus(403);
   }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Boti is awake!'));
+// קבלת הודעות ושליחת תשובה
+app.post('/webhook', async (req, res) => {
+  const body = req.body;
+
+  if (body.object === 'whatsapp_business_account') {
+    if (body.entry && body.entry[0].changes && body.entry[0].changes[0].value.messages) {
+      const message = body.entry[0].changes[0].value.messages[0];
+      const from = message.from; // מספר הטלפון של השולח
+      const msgText = message.text.body; // הטקסט שנשלח
+
+      console.log(`קיבלתי הודעה מ-${from}: ${msgText}`);
+
+      // שליחת תשובה אוטומטית
+      try {
+        await axios({
+          method: "POST",
+          url: `https://graph.facebook.com/v18.0/${body.entry[0].changes[0].value.metadata.phone_number_id}/messages`,
+          data: {
+            messaging_product: "whatsapp",
+            to: from,
+            text: { body: "קיבלתי את ההודעה שלך! אני Boti." },
+          },
+          headers: { "Authorization": `Bearer ${ACCESS_TOKEN}` },
+        });
+      } catch (err) {
+        console.log("שגיאה בשליחה: " + err.message);
+      }
+    }
+    res.sendStatus(200);
+  } else {
+    res.sendStatus(404);
+  }
+});
+
+app.listen(process.env.PORT || 3000, () => console.log('Boti is ready to talk!'));
