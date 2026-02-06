@@ -65,10 +65,9 @@ app.post('/webhook', async (req, res) => {
       if (msgText) {
         console.log('הודעה נכנסת: ' + msgText);
 
-        // נסה מודלים לפי סדר עד שמצליח
-        const geminiModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+        // המודלים שלך – gemini-2.5-flash הכי טוב
+        const geminiModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
         let geminiResponse = null;
-        let workingModel = null;
 
         for (let model of geminiModels) {
           try {
@@ -76,7 +75,6 @@ app.post('/webhook', async (req, res) => {
             geminiResponse = await axios.post(geminiUrl, {
               contents: [{ role: 'user', parts: [{ text: msgText }] }]
             });
-            workingModel = model;
             console.log(`מודל שעבד: ${model}`);
             break;
           } catch (err) {
@@ -84,10 +82,13 @@ app.post('/webhook', async (req, res) => {
           }
         }
 
-        let botResponse = 'מצטער, לא הצלחתי לייצר תשובה.';
-        if (geminiResponse && geminiResponse.data && geminiResponse.data.candidates && 
-            geminiResponse.data.candidates[0] && geminiResponse.data.candidates[0].content && 
-            geminiResponse.data.candidates[0].content.parts && geminiResponse.data.candidates[0].content.parts[0]) {
+        let botResponse = 'מצטער, בעיה טכנית. נסה שוב.';
+        if (geminiResponse && geminiResponse.data && 
+            geminiResponse.data.candidates && 
+            geminiResponse.data.candidates[0] && 
+            geminiResponse.data.candidates[0].content && 
+            geminiResponse.data.candidates[0].content.parts && 
+            geminiResponse.data.candidates[0].content.parts[0].text) {
           botResponse = geminiResponse.data.candidates[0].content.parts[0].text;
         }
 
@@ -118,5 +119,5 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.listen(process.env.PORT || 3000, () => 
-  console.log('Boti is online (Gemini Fixed)')
+  console.log('Boti is online (Gemini 2.5 Fixed!)')
 );
