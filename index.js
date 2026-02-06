@@ -38,7 +38,7 @@ app.post('/webhook', async (req, res) => {
         try {
           // קריאה ישירה ל-API של ג'מיני עם מודל ה-PRO היציב
           const geminiResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent?key=${GEMINI_API_KEY}`,
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`
             {
               contents: [{ parts: [{ text: msgText }] }]
             },
