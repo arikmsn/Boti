@@ -8,34 +8,6 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-// endpoint לבדיקת מודלים זמינים – מחק אחרי השימוש
-app.get('/list-models', async (req, res) => {
-  try {
-    const listUrl = `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_API_KEY}`;
-    const response = await axios.get(listUrl);
-    
-    let supportedModels = [];
-    if (response.data.models) {
-      response.data.models.forEach(model => {
-        if (model.supportedGenerationMethods && 
-            model.supportedGenerationMethods.includes('generateContent')) {
-          supportedModels.push({
-            name: model.name,
-            displayName: model.displayName || 'לא ידוע'
-          });
-        }
-      });
-    }
-    
-    res.json({
-      availableModels: supportedModels,
-      allModels: response.data.models?.map(m => m.name) || []
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.response?.data || err.message });
-  }
-});
-
 app.get('/webhook', (req, res) => {
   if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
     return res.send(req.query['hub.challenge']);
@@ -45,79 +17,65 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
-  const body = req.body;
-
   try {
-    if (
-      body.object === 'whatsapp_business_account' &&
-      body.entry &&
-      body.entry[0] &&
-      body.entry[0].changes &&
-      body.entry[0].changes[0] &&
-      body.entry[0].changes[0].value &&
-      body.entry[0].changes[0].value.messages &&
-      body.entry[0].changes[0].value.messages[0]
-    ) {
-      const message = body.entry[0].changes[0].value.messages[0];
-      const from = message.from;
-      const msgText = message.text ? message.text.body : '';
+    const body = req.body;
+    
+    // בדיקה פשוטה יותר
+    if (!body.entry || !body.entry[0] || !body.entry[0].changes || !body.entry[0].changes[0]) {
+      return res.sendStatus(200);
+    }
 
-      if (msgText) {
-        console.log('הודעה נכנסת: ' + msgText);
+    const change = body.entry[0].changes[0];
+    const value = change.value;
+    
+    // וודא שיש הודעה
+    if (value.messages && value.messages[0] && value.messages[0].text) {
+      const message = value.messages[0];
+      const from = message.from;  // 972541234567@c.us
+      const msgText = message.text.body;
+      
+      console.log('הודעה נכנסת מ: ' + from);
+      console.log('תוכן: ' + msgText);
 
-        // המודלים שלך – gemini-2.5-flash הכי טוב
-        const geminiModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
-        let geminiResponse = null;
+      // Gemini – gemini-2.5-flash (הכי טוב אצלך)
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+      
+      const geminiResponse = await axios.post(geminiUrl, {
+        contents: [{ role: 'user', parts: [{ text: msgText }] }]
+      });
 
-        for (let model of geminiModels) {
-          try {
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-            geminiResponse = await axios.post(geminiUrl, {
-              contents: [{ role: 'user', parts: [{ text: msgText }] }]
-            });
-            console.log(`מודל שעבד: ${model}`);
-            break;
-          } catch (err) {
-            console.log(`מודל ${model} נכשל`);
+      const botResponse = geminiResponse.data.candidates[0].content.parts[0].text;
+      console.log('תשובת Gemini: ' + botResponse);
+
+      // שלח תשובה לווטסאפ – תקן את ה-from
+      const phoneNumberId = value.metadata.phone_number_id;
+      const recipient = from.replace('@c.us', '');  // הסר @c.us
+
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: recipient,  // עכשיו זה 972541234567 בלי @c.us
+          text: { body: botResponse }
+        },
+        {
+          headers: {
+            'Authorization': 'Bearer ' + WHATSAPP_TOKEN,
+            'Content-Type': 'application/json'
           }
         }
+      );
 
-        let botResponse = 'מצטער, בעיה טכנית. נסה שוב.';
-        if (geminiResponse && geminiResponse.data && 
-            geminiResponse.data.candidates && 
-            geminiResponse.data.candidates[0] && 
-            geminiResponse.data.candidates[0].content && 
-            geminiResponse.data.candidates[0].content.parts && 
-            geminiResponse.data.candidates[0].content.parts[0].text) {
-          botResponse = geminiResponse.data.candidates[0].content.parts[0].text;
-        }
-
-        await axios.post(
-          `https://graph.facebook.com/v18.0/${body.entry[0].changes[0].value.metadata.phone_number_id}/messages`,
-          {
-            messaging_product: 'whatsapp',
-            to: from,
-            text: { body: botResponse },
-          },
-          {
-            headers: {
-              Authorization: 'Bearer ' + WHATSAPP_TOKEN,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        console.log('תשובה נשלחה בהצלחה!');
-      }
+      console.log('✅ תשובה נשלחה בהצלחה ל: ' + recipient);
     }
   } catch (err) {
-    console.error('שגיאה:');
-    console.error(err.response ? JSON.stringify(err.response.data) : err.message);
+    console.error('❌ שגיאה:');
+    console.error(JSON.stringify(err.response?.data, null, 2) || err.message);
   }
 
   res.sendStatus(200);
 });
 
 app.listen(process.env.PORT || 3000, () => 
-  console.log('Boti is online (Gemini 2.5 Fixed!)')
+  console.log('✅ Boti מוכן! שלח הודעה לווטסאפ')
 );
