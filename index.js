@@ -4,10 +4,12 @@ const axios = require('axios');
 const app = express();
 app.use(express.json());
 
-const PPLX_API_KEY = process.env.PPLX_API_KEY;   // <– חדש
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+// משתני סביבה
+const PPLX_API_KEY = process.env.PPLX_API_KEY;      // Perplexity
+const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;  // WhatsApp Cloud API
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;      // Webhook verify token
 
+// Verify webhook מ-WhatsApp
 app.get('/webhook', (req, res) => {
   if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
     return res.send(req.query['hub.challenge']);
@@ -16,6 +18,7 @@ app.get('/webhook', (req, res) => {
   }
 });
 
+// Webhook לקבלת הודעות
 app.post('/webhook', async (req, res) => {
   try {
     const body = req.body;
@@ -34,7 +37,7 @@ app.post('/webhook', async (req, res) => {
 
     if (value.messages && value.messages[0] && value.messages[0].text) {
       const message = value.messages[0];
-      const from = message.from;              // לדוגמה: 9725XXXXXXX@c.us
+      const from = message.from;           // לדוגמה: 9725XXXXXXX@c.us
       const msgText = message.text.body;
 
       console.log('WhatsApp from:', from);
@@ -46,7 +49,7 @@ app.post('/webhook', async (req, res) => {
       const pplxResponse = await axios.post(
         pplxUrl,
         {
-          model: 'sonar',   // אפשר להחליף למודל אחר אם תרצה[web:59][web:63]
+          model: 'sonar',   // אפשר להחליף למודל אחר לפי התיעוד
           messages: [
             {
               role: 'system',
@@ -67,7 +70,8 @@ app.post('/webhook', async (req, res) => {
       );
 
       const botResponse =
-        pplxResponse.data.choices[0].message.content || 'I could not generate a response.';[web:59][web:63]
+        pplxResponse.data.choices[0].message.content ||
+        'I could not generate a response.';
 
       console.log('Perplexity answer:', botResponse);
 
@@ -100,6 +104,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log('Boti Perplexity branch is online')
-);
+// הפעלת השרת
+app.listen(process.env.PORT || 3000, () => {
+  console.log('Boti Perplexity branch is online');
+});
