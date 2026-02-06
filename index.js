@@ -8,9 +8,33 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
-// בחר אחד המודלים התקניים ל-v1
-// gemini-flash-latest  או  gemini-2.0-flash  וכו'
-const GEMINI_MODEL = 'gemini-flash-latest'; 
+// endpoint לבדיקת מודלים זמינים – מחק אחרי השימוש
+app.get('/list-models', async (req, res) => {
+  try {
+    const listUrl = `https://generativelanguage.googleapis.com/v1/models?key=${GEMINI_API_KEY}`;
+    const response = await axios.get(listUrl);
+    
+    let supportedModels = [];
+    if (response.data.models) {
+      response.data.models.forEach(model => {
+        if (model.supportedGenerationMethods && 
+            model.supportedGenerationMethods.includes('generateContent')) {
+          supportedModels.push({
+            name: model.name,
+            displayName: model.displayName || 'לא ידוע'
+          });
+        }
+      });
+    }
+    
+    res.json({
+      availableModels: supportedModels,
+      allModels: response.data.models?.map(m => m.name) || []
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
 
 app.get('/webhook', (req, res) => {
   if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
@@ -41,29 +65,29 @@ app.post('/webhook', async (req, res) => {
       if (msgText) {
         console.log('הודעה נכנסת: ' + msgText);
 
-        // שים לב לשינוי: מודל עדכני ונתיב נכון
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+        // נסה מודלים לפי סדר עד שמצליח
+        const geminiModels = ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'];
+        let geminiResponse = null;
+        let workingModel = null;
 
-        const geminiResponse = await axios.post(geminiUrl, {
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: msgText }],
-            },
-          ],
-        });
+        for (let model of geminiModels) {
+          try {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+            geminiResponse = await axios.post(geminiUrl, {
+              contents: [{ role: 'user', parts: [{ text: msgText }] }]
+            });
+            workingModel = model;
+            console.log(`מודל שעבד: ${model}`);
+            break;
+          } catch (err) {
+            console.log(`מודל ${model} נכשל`);
+          }
+        }
 
         let botResponse = 'מצטער, לא הצלחתי לייצר תשובה.';
-
-        if (
-          geminiResponse.data &&
-          geminiResponse.data.candidates &&
-          geminiResponse.data.candidates[0] &&
-          geminiResponse.data.candidates[0].content &&
-          geminiResponse.data.candidates[0].content.parts &&
-          geminiResponse.data.candidates[0].content.parts[0] &&
-          geminiResponse.data.candidates[0].content.parts[0].text
-        ) {
+        if (geminiResponse && geminiResponse.data && geminiResponse.data.candidates && 
+            geminiResponse.data.candidates[0] && geminiResponse.data.candidates[0].content && 
+            geminiResponse.data.candidates[0].content.parts && geminiResponse.data.candidates[0].content.parts[0]) {
           botResponse = geminiResponse.data.candidates[0].content.parts[0].text;
         }
 
@@ -86,18 +110,13 @@ app.post('/webhook', async (req, res) => {
       }
     }
   } catch (err) {
-    console.error('שגיאה בקריאה ל-Gemini או ל-WhatsApp:');
-    console.error(
-      err.response
-        ? JSON.stringify(err.response.data, null, 2)
-        : err.message
-    );
+    console.error('שגיאה:');
+    console.error(err.response ? JSON.stringify(err.response.data) : err.message);
   }
 
-  // חשוב להחזיר 200 לפייסבוק גם אם הייתה שגיאה
   res.sendStatus(200);
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log('Boti is online (v1, Gemini)')
+app.listen(process.env.PORT || 3000, () => 
+  console.log('Boti is online (Gemini Fixed)')
 );
