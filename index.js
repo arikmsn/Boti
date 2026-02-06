@@ -5,14 +5,13 @@ const { OpenAI } = require('openai');
 const app = express();
 app.use(express.json());
 
-// הקוד עכשיו יחפש את המפתחות ב"כספת" של Render
+// --- משתני סביבה (הגדרנו אותם ב-Render) ---
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN;
 const VERIFY_TOKEN = process.env.VERIFY_TOKEN || "Boti123";
 
 const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
-// אימות ה-Webhook (נשאר אותו דבר)
 app.get('/webhook', (req, res) => {
   if (req.query['hub.verify_token'] === VERIFY_TOKEN) {
     res.send(req.query['hub.challenge']);
@@ -29,9 +28,8 @@ app.post('/webhook', async (req, res) => {
     const msgText = message.text ? message.text.body : "";
 
     if (msgText) {
-      console.log(`הודעה מ-${from}: ${msgText}`);
+      console.log(`קיבלתי הודעה: ${msgText}`);
       try {
-        // שואלים את OpenAI (מודל GPT-3.5 או GPT-4o-mini)
         const completion = await openai.chat.completions.create({
           model: "gpt-4o-mini", 
           messages: [{ role: "user", content: msgText }],
@@ -39,7 +37,6 @@ app.post('/webhook', async (req, res) => {
 
         const botResponse = completion.choices[0].message.content;
 
-        // שליחה חזרה לוואטסאפ
         await axios({
           method: "POST",
           url: `https://graph.facebook.com/v18.0/${body.entry[0].changes[0].value.metadata.phone_number_id}/messages`,
@@ -50,7 +47,7 @@ app.post('/webhook', async (req, res) => {
           },
           headers: { "Authorization": `Bearer ${WHATSAPP_TOKEN}` },
         });
-        console.log("תשובה נשלחה!");
+        console.log("התשובה נשלחה בהצלחה!");
       } catch (err) {
         console.error("שגיאה:", err.message);
       }
@@ -59,4 +56,4 @@ app.post('/webhook', async (req, res) => {
   }
 });
 
-app.listen(process.env.PORT || 3000, () => console.log('Boti is ready with OpenAI!'));
+app.listen(process.env.PORT || 3000, () => console.log('Boti is ready!'));
